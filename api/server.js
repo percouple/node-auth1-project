@@ -23,7 +23,7 @@ const server = express();
 server.use(helmet());
 server.use(express.json());
 server.use(cors());
-server.use('/api/user', userRouter);
+server.use('/api/users', userRouter);
 server.use('/api/auth', authRouter)
 
 
