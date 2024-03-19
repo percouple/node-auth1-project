@@ -1,9 +1,9 @@
 const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
-const session = require('express-session');
-const userRouter = require('./users/users-router');
-const authRouter = require('./auth/auth-router');
+const session = require("express-session");
+const userRouter = require("./users/users-router");
+const authRouter = require("./auth/auth-router");
 
 /**
   Do what needs to be done to support sessions with the `express-session` package!
@@ -20,18 +20,32 @@ const authRouter = require('./auth/auth-router');
 
 const server = express();
 
+server.use(
+  session({
+    name: "chocolatechip",
+    secret: "Nobody Tosses a Dwarf!",
+    cookie: {
+      maxAge: 1 * 24 * 60 * 60 * 1000,
+      secure: false, // only set cookies over https. Server will not send back a cookie over http.
+    },
+    httpOnly: true, // don't let JS code access cookies. Browser extensions run JS code on your browser!
+    resave: false,
+    saveUninitialized: false,
+  })
+);
 server.use(helmet());
 server.use(express.json());
 server.use(cors());
-server.use('/api/users', userRouter);
-server.use('/api/auth', authRouter)
-
+server.use("/api/users", userRouter);
+server.use("/api/auth", authRouter);
 
 server.get("/", (req, res) => {
   res.json({ api: "up" });
 });
 
-server.use((err, req, res, next) => { // eslint-disable-line
+
+server.use((err, req, res, next) => {
+  // eslint-disable-line
   res.status(err.status || 500).json({
     message: err.message,
     stack: err.stack,

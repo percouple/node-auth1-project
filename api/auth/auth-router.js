@@ -6,78 +6,77 @@ const {
   checkPasswordLength,
   checkUsernameExists,
 } = require("./auth-middleware");
-const knex = require("../../data/db-config");
-const Database = knex();
+const Database = require("../users/users-model");
+const bcrypt = require("bcryptjs");
+const session = require("express-session");
 
 // 1 [POST] /api/auth/register { "username": "sue", "password": "1234" }
 router.post(
   "/register",
   checkUsernameFree,
   checkPasswordLength,
-  (req, res, next) => {
-    res.status(200).json("POST AUTH REGISTER")
-  })
-// response:
-// status 200
-// {
-//   "user_id": 2,
-//   "username": "sue"
-// }
+  async (req, res, next) => {
+    const password = req.body.password;
+    const hash = bcrypt.hashSync(password, 12);
+    req.body.password = hash;
 
-// response on username taken:
-// status 422
-// {
-//   "message": "Username taken"
-// }
+    await Database.add(req.body).then((result) => {
+      const [id] = result;
+      res.status(200).json({ user_id: id, username: req.body.username });
+    });
+  }
+);
 
-// response on password three chars or less:
-// status 422
-// {
-//   "message": "Password must be longer than 3 chars"
-// }
-
-
-  // 2 [POST] /api/auth/login { "username": "sue", "password": "1234" }
-  router.post(
+// 2 [POST] /api/auth/login { "username": "sue", "password": "1234" }
+router.post(
   "/login",
-  checkUsernameFree,
+  checkUsernameExists,
   checkPasswordLength,
-  (req, res, next) => {
-    res.status(200).json("POST AUTH LOGIN")
-  })
-  // response:
-  // status 200
-  // {
-  //   "message": "Welcome sue!"
-  // }
+  async (req, res, next) => {
+    const username = req.body.username;
+    await Database.findBy(username)
+      .then((result) => {
+        // If the username doesn't exist
+        if (!req.usernameExists) {
+          next({ status: 401, message: "invalid credentials" });
+        }
 
-  // response on invalid credentials:
-  // status 401
-  // {
-  //   "message": "Invalid credentials"
-  // }
+        // Validate password
+        const [{ password }] = result;
+        if (!bcrypt.compareSync(req.body.password, password)) {
+          console.log("INVALLIDE PASSWORD");
+          next({ status: 401, message: "invalid credentials" });
 
+          // Handle correct validation of username and password
+        } else {
+          console.log("CORRECT PASSWORD - VALIDATED");
+          req.session.username = username;
+          req.session.loggedIn = true;
 
-  // 3 [GET] /api/auth/logout
-  router.get(
-    "/",
-    checkUsernameFree,
-    checkPasswordLength,
-    (req, res, next) => {
-      res.status(200).json("GET AUTH")
-    })
-  // response for logged-in users:
-  // status 200
-  // {
-  //   "message": "logged out"
-  // }
+          res.status(200).json({ message: `Welcome ${username}!` });
+        }
+      })
+      .catch(next);
+  }
+);
 
-  // response for not-logged-in users:
-  // status 200
-  // {
-  //   "message": "no session"
-  // }
+// 3 [GET] /api/auth/logout
+router.get("/logout", (req, res, next) => {
+  if (req.session.loggedIn) {
+    res.clearCookie('chocolatechip');
+    console.log(req.session)
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Error destroying session:', err);
+        return res.status(500).json({ message: 'Server error' });
+      }
+      return res.status(200).json({ message: "logged out" });
+  })}
+  else {
+    return res.status(200).json({ message: "no session" });
+  }
 
+});
 
 // Don't forget to add the router to the `exports` object so it can be required in other modules
 
